@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>todoList</title>
+
+    <link rel="stylesheet" href="todo.css">
+</head>
+<body>
+    <div class="title">
+        <h1 class="main-title">TODO LIST</h1>
+        <div class="sub-title">Save Your Todo List Here</div>
+    </div>
+
+
+    <div class="search-container">
+        <input class="js-search-input search-input" type="text" placeholder="Search here">
+    </div>
+
+
+        <div class="add-button-container"><button class="js-add-button add-button" >Add +</button></div>
+        <div class="add-input-container">
+
+            <input class="js-todo-input add-input" type="text" placeholder="type here...">
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nos</th>
+                        <th>Items</th>
+                        <th>Checkbox</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody class="js-todo-list-items">
+                    <!-- dynamically rendered todo items -->
+                </tbody>
+            </table>
+        </div>
+        
+        <h2>Completed Tasks</h2>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nos</th>
+                        <th>Items</th>
+                        <th>Checkbox</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody class="js-completed-list-items"></tbody>
+            </table>
+        </div>
+        
+
+
+    <script src="todolist.js">
+
+    </script>
+</body>
+</html>
+
