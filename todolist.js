@@ -1,116 +1,185 @@
-// Initialize the todoList array from localStorage or as an empty array
-const todoList = JSON.parse(localStorage.getItem("todoList")) || [
-  { inputValue: "Buy groceries", completed: false },
-  { inputValue: "Buy accommodation", completed: false },
-  { inputValue: "Pay bills", completed: false },
-  { inputValue: "Clean house", completed: false }
-];
+const API_URL = "http://localhost:3000/todos";
 
-console.log(todoList);
-renderTodoList(todoList);
-
-// Function to render the todo list
-function renderTodoList(filteredList = todoList) {
-  let todoNo = 1;
-  let completedNo = 1;
-  let tableBody = document.querySelector(".js-todo-list-items");
-  let completedTableBody = document.querySelector(".js-completed-list-items");
-
-  tableBody.innerHTML = ""; // Clear previous data
-  completedTableBody.innerHTML = ""; // Clear completed tasks
-
-  filteredList.forEach((todoObject, index) => {
-    const { inputValue, completed } = todoObject;
-
-    // Create a new row element
-    const row = document.createElement("tr");
-    row.innerHTML = `
-      <td>${completed ? completedNo++ : todoNo++}</td>
-      <td>${inputValue}</td>
-      <td>
-          <label class="switch">
-              <input type="checkbox" ${completed ? "checked" : ""} data-index="${index}">
-              <span class="slider round"></span>
-          </label>
-      </td>
-      <td>
-          <button class="js-delete-button delete-button">Delete</button>
-      </td>
-    `;
-
-    // Append the row to the correct table
-    if (completed) {
-      completedTableBody.appendChild(row);
-    } else {
-      tableBody.appendChild(row);
-    }
-  });
-
-  // Add event listeners to delete buttons
-  document.querySelectorAll(".js-delete-button").forEach((deleteButton) => {
-    deleteButton.addEventListener("click", (event) => {
-      const row = event.target.closest("tr");
-      const todoText = row.children[1].textContent;
-      const itemIndex = todoList.findIndex((todo) => todo.inputValue === todoText);
-
-      if (itemIndex !== -1) {
-        todoList.splice(itemIndex, 1);
-        localStorage.setItem("todoList", JSON.stringify(todoList));
+// Function to fetch and render todos
+async function fetchTodos() {
+    try {
+        const response = await fetch(API_URL);
+        const data = await response.json();
+        const todoList = Array.isArray(data) ? data : data.todos || [];
         renderTodoList(todoList);
-      }
-    });
-  });
-
-  // Add event listeners to checkboxes
-  document.querySelectorAll(".switch input").forEach((checkbox) => {
-    checkbox.addEventListener("change", (event) => {
-      const index = event.target.dataset.index;
-      todoList[index].completed = event.target.checked;
-      localStorage.setItem("todoList", JSON.stringify(todoList));
-      renderTodoList(todoList);
-    });
-  });
+    } catch (error) {
+        console.error("Error fetching todos:", error);
+    }
 }
 
-// Function to add a new todo item
-const addTodo = () => {
-  const inputElement = document.querySelector(".js-todo-input");
-  const inputValue = inputElement.value.trim();
+// Function to render the todo list
+function renderTodoList(todoList) {
+    let todoNo = 1;
+    let completedNo = 1;
+    let tableBody = document.querySelector(".js-todo-list-items");
+    let completedTableBody = document.querySelector(".js-completed-list-items");
+    
+    tableBody.innerHTML = "";
+    completedTableBody.innerHTML = "";
 
-  if (!inputValue) {
-    alert("Please add a todo item");
-    return;
-  }
+    todoList.forEach((todoObject) => {
+        const { id, inputValue, completed } = todoObject;
+        
+        const row = document.createElement("tr");
+        row.innerHTML = `
+            <td>${completed ? completedNo++ : todoNo++}</td>
+            <td class="editable" data-id="${id}">${inputValue}</td>
+            <td>
+                <label class="switch">
+                    <input type="checkbox" ${completed ? "checked" : ""} data-id="${id}">
+                    <span class="slider round"></span>
+                </label>
+            </td>
+            <td>
+                <button class="js-delete-button delete-button" data-id="${id}">Delete</button>
+            </td>
+        `;
+        
+        if (completed) {
+            completedTableBody.appendChild(row);
+        } else {
+            tableBody.appendChild(row);
+        }
+    });
 
-  todoList.push({ inputValue, completed: false });
-  inputElement.value = "";
-  localStorage.setItem("todoList", JSON.stringify(todoList));
-  renderTodoList(todoList);
+    attachEventListeners();
+}
+
+// Function to attach event listeners to dynamically created elements
+function attachEventListeners() {
+    document.querySelectorAll(".js-delete-button").forEach((button) => {
+        button.addEventListener("click", async (event) => {
+            const id = event.target.dataset.id;
+            await deleteTodo(id);
+        });
+    });
+
+    document.querySelectorAll(".switch input").forEach((checkbox) => {
+        checkbox.addEventListener("change", async (event) => {
+            const id = event.target.dataset.id;
+            await toggleTodoStatus(id, event.target.checked);
+        });
+    });
+
+    document.querySelectorAll(".editable").forEach((td) => {
+        td.addEventListener("dblclick", enableEditing);
+    });
+}
+
+// Enable editing when double-clicking
+function enableEditing(event) {
+    const td = event.target;
+    const currentText = td.innerText;
+    const id = td.dataset.id;
+    
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = currentText;
+    input.classList.add("edit-input");
+    
+    td.innerHTML = "";
+    td.appendChild(input);
+    input.focus();
+    input.select(); // Select all text when editing starts
+    
+    const handleSave = (value) => {
+        if (value.trim() === currentText) {
+            td.innerText = currentText; // Restore original if no changes
+            return;
+        }
+        saveEdit(td, id, value);
+    };
+    
+    input.addEventListener("blur", () => handleSave(input.value));
+    input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            handleSave(input.value);
+        } else if (event.key === "Escape") {
+            td.innerText = currentText; // Cancel edit on Escape
+        }
+    });
+}
+
+// Save the edited value
+async function saveEdit(td, id, newValue) {
+    if (!newValue.trim()) return;
+    await fetch(`${API_URL}/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inputValue: newValue })
+    });
+    fetchTodos();
+}
+
+// Function to add a new todo
+const addTodo = async () => {
+    const inputElement = document.querySelector(".js-todo-input");
+    const inputValue = inputElement.value.trim();
+    
+    if (!inputValue) return;
+    
+    try {
+        const response = await fetch(API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ inputValue, completed: false })
+        });
+        
+        if (response.ok) {
+            inputElement.value = ""; // Clear input field
+            // Removed automatic focus
+            await fetchTodos(); // Reload the list to show the new item
+        }
+    } catch (error) {
+        console.error("Error adding todo:", error);
+    }
 };
 
-// Event listeners for adding todos
+// Function to delete a todo item
+const deleteTodo = async (id) => {
+    await fetch(`${API_URL}/${id}`, { method: "DELETE" });
+    fetchTodos();
+};
+
+// Function to toggle todo completion status
+const toggleTodoStatus = async (id, completed) => {
+    await fetch(`${API_URL}/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ completed })
+    });
+    fetchTodos();
+};
+
+// Function to search todos
+const findTodo = async () => {
+    const searchElement = document.querySelector(".js-search-input");
+    const searchValue = searchElement.value.trim().toLowerCase();
+
+    const response = await fetch(API_URL);
+    let data = await response.json();
+    let todoList = Array.isArray(data) ? data : data.todos || [];
+
+    if (searchValue !== "") {
+        todoList = todoList.filter(todo =>
+            todo.inputValue.toLowerCase().includes(searchValue)
+        );
+    }
+    renderTodoList(todoList);
+};
+
+// Event Listeners
 document.querySelector(".js-add-button").addEventListener("click", addTodo);
 document.querySelector(".js-todo-input").addEventListener("keydown", (event) => {
-  if (event.key === "Enter") {
-    addTodo();
-  }
+    if (event.key === "Enter") addTodo();
 });
-
-// Function to filter the todo list dynamically as user types
-const findTodo = () => {
-  const searchElement = document.querySelector(".js-search-input");
-  const searchValue = searchElement.value.trim().toLowerCase();
-
-  if (searchValue === "") {
-    renderTodoList(todoList); // Show full list if search is empty
-  } else {
-    const filteredTodos = todoList.filter((todo) =>
-      todo.inputValue.toLowerCase().includes(searchValue)
-    );
-
-    renderTodoList(filteredTodos);
-  }
-};
-
-// Event listener for real-time search filtering
 document.querySelector(".js-search-input").addEventListener("input", findTodo);
+
+// Fetch initial todos
+fetchTodos();
